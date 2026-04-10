@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>ARK Manager Ultimate (Live Sync)</title>
+    <style>
+        /* [기존 디자인 유지] */
+        :root { --bg-color: #fdfbf7; --text-color: #333333; --accent-pink: #ff6b81; --accent-blue: #7bed9f; --accent-yellow: #ffeaa7; --card-bg: #ffffff; --shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        body { background-color: var(--bg-color); color: var(--text-color); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 30px; user-select: none; }
+        h1 { color: var(--accent-pink); text-shadow: 2px 2px 0px var(--accent-yellow); margin-bottom: 25px; font-weight: 900; letter-spacing: 1px; }
+        
+        /* 탭 버튼 */
+        .tab-container { margin-bottom: -2px; display: flex; flex-wrap: wrap; gap: 8px; }
+        .tab-btn { background: #f1f2f6; color: #777; border: none; padding: 12px 20px; cursor: pointer; font-weight: bold; font-size: 15px; border-radius: 15px 15px 0 0; transition: all 0.2s; flex-grow: 1; text-align: center; box-shadow: inset 0 -2px 5px rgba(0,0,0,0.05); }
+        .tab-btn.active { background: var(--card-bg); color: var(--accent-pink); box-shadow: 0 -5px 15px rgba(0,0,0,0.05); border-top: 3px solid var(--accent-pink); }
+        .tab-btn:hover:not(.active) { background: #eccc68; color: white; }
+        
+        /* 콘텐츠 박스 */
+        .content { display: none; padding: 30px; background: var(--card-bg); border-radius: 0 0 20px 20px; min-height: 600px; box-shadow: var(--shadow); }
+        .show { display: block; animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* 공통 UI */
+        .section-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px dashed #eee; padding-bottom: 15px; margin-bottom: 25px; }
+        .section-title { margin: 0; color: #2f3542; font-size: 1.5em; }
+        .reset-btn { background: #ff7675; color: white; border: none; border-radius: 20px; padding: 8px 18px; cursor: pointer; font-weight: bold; font-size: 14px; box-shadow: 2px 2px 5px rgba(255, 118, 117, 0.4); transition: 0.2s; }
+        .reset-btn:hover { background: #d63031; transform: translateY(-2px); }
+
+        /* 인벤토리 */
+        .inventory-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; }
+        .inv-item { background: #fdfdfd; padding: 12px 18px; border: 1px solid #f1f2f6; border-radius: 15px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,0.03); transition: 0.2s; }
+        .inv-item:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.08); border-color: var(--accent-blue); }
+        .inv-item-info { display: flex; align-items: center; width: 60%; color: #57606f; font-weight: bold; }
+        .item-icon-large { width: 44px; height: 44px; object-fit: contain; margin-right: 12px; background: #fff; border-radius: 10px; padding: 4px; border: 1px solid #eee; }
+        .qty-control { display: flex; align-items: center; background: #f1f2f6; border-radius: 25px; padding: 4px; }
+        .qty-btn { width: 28px; height: 28px; border-radius: 50%; border: none; cursor: pointer; font-size: 16px; font-weight: bold; display: flex; align-items: center; justify-content: center; color: white; transition: 0.2s; }
+        .btn-minus { background-color: #fab1a0; }
+        .btn-minus:hover { background-color: #e17055; }
+        .btn-plus { background-color: #55efc4; color: #00b894; }
+        .btn-plus:hover { background-color: #00b894; color: white; }
+        .qty-input { width: 50px; background: transparent; border: none; color: #2d3436; text-align: center; font-size: 16px; font-weight: bold; outline: none; }
+
+        /* 보스 */
+        .boss-layout { display: flex; gap: 30px; height: 75vh; }
+        .boss-list-area { width: 30%; min-width: 300px; overflow-y: auto; padding-right: 15px; border-right: 2px dashed #eee; }
+        .boss-detail-area { width: 70%; overflow-y: auto; padding-right: 10px; }
+        .map-folder-btn { width: 100%; padding: 15px; margin-top: 10px; margin-bottom: 8px; background: #ffffff; color: #2f3542; border: 1px solid #eee; text-align: left; cursor: pointer; font-size: 1.1em; font-weight: bold; display: flex; justify-content: space-between; align-items: center; border-radius: 12px; transition: 0.3s; box-shadow: 0 2px 5px rgba(0,0,0,0.03); }
+        .map-folder-btn:hover { background: #f8f9fa; border-color: var(--accent-pink); color: var(--accent-pink); }
+        .map-boss-container { overflow: hidden; border-left: 3px solid #eee; margin-left: 15px; padding-left: 10px; }
+        .map-boss-container.hidden { display: none; } 
+        .folder-arrow { transition: transform 0.3s; color: #a4b0be; }
+        .boss-btn { display: flex; align-items: center; width: 100%; padding: 10px; margin-bottom: 5px; background: #fff; color: #747d8c; border: 1px solid transparent; border-radius: 10px; cursor: pointer; text-align: left; transition: 0.2s; font-weight: 500; }
+        .boss-btn:hover { background: #fff0f5; color: var(--accent-pink); transform: translateX(5px); font-weight: bold; }
+        .boss-icon-small { width: 35px; height: 35px; object-fit: cover; border-radius: 50%; margin-right: 10px; border: 2px solid #eee; background: white; }
+        .boss-main-image { width: 100%; max-height: 350px; object-fit: cover; border-radius: 20px; border: none; margin-bottom: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 15px; border: 1px solid #eee; border-radius: 15px; overflow: hidden; background: white; }
+        th, td { padding: 18px; text-align: center; vertical-align: middle; border-bottom: 1px solid #f1f2f6; } 
+        th { background: #f8f9fa; color: #57606f; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
+        .boss-row-gamma { background-color: #e6fffa !important; border-left: 5px solid #00b894; }
+        .boss-row-beta { background-color: #e3f2fd !important; border-left: 5px solid #2979ff; }
+        .boss-row-alpha { background-color: #fff0f0 !important; border-left: 5px solid #ff7675; }
+        .req-item-row { text-align: left; margin-bottom: 8px; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.7); border-radius: 10px; color: #57606f; border: 1px solid rgba(0,0,0,0.05); }
+        .req-left { display: flex; align-items: center; font-weight: 600; }
+        .item-icon-small { width: 30px; height: 30px; vertical-align: middle; margin-right: 10px; background: white; border-radius: 5px; padding: 2px; }
+        .req-right { display: flex; align-items: center; gap: 5px; }
+        .boss-req-input { width: 50px; background: white; border: 1px solid #ddd; color: #333; text-align: center; border-radius: 5px; padding: 5px; font-weight: bold; font-size: 14px; }
+        .quick-add-btn { background-color: #55efc4; color: #00b894; border: none; border-radius: 50%; width: 26px; height: 26px; font-size: 16px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0.8; transition: 0.2s; }
+        .quick-add-btn:hover { opacity: 1; transform: scale(1.1); box-shadow: 0 2px 5px rgba(85, 239, 196, 0.4); }
+        .status-ok { color: #00b894; font-weight: bold; background: white; padding: 5px 12px; border-radius: 20px; border: 1px solid #00b894; }
+        .status-no { color: #ff7675; font-weight: bold; background: white; padding: 5px 12px; border-radius: 20px; border: 1px solid #ff7675; }
+        .row-ok { opacity: 0.6; text-decoration: line-through; background: rgba(0,0,0,0.05); }
+        .row-ok img { filter: grayscale(100%); opacity: 0.5; }
+        .row-no { border: 1px solid #ff7675; background: rgba(255, 118, 117, 0.1); color: #d63031; }
+        .boss-reward-info { background: rgba(255,255,255,0.6); border: 2px dashed #a29bfe; border-radius: 12px; padding: 15px; margin-top: 15px; text-align: left; }
+        .unlock-tag { background: #fff; color: #0984e3; padding: 4px 10px; border-radius: 20px; font-size: 0.85em; border: 1px solid #74b9ff; box-shadow: 0 2px 5px rgba(0,0,0,0.03); font-weight: bold; margin-right: 4px; display: inline-block; margin-bottom: 4px;}
+
+        /* BP 도감 */
+        .bp-table-container { overflow-x: auto; border-radius: 15px; border: 1px solid #eee; }
+        .bp-table { width: 100%; border-collapse: collapse; background: white; }
+        .bp-table th { background: #f8f9fa; color: #57606f; padding: 18px; border-bottom: 2px solid #eee; }
+        .bp-table td { padding: 15px; border-bottom: 1px solid #f1f2f6; vertical-align: middle; text-align: center; color: #2f3542; }
+        .bp-table tr:hover { background: #f1f2f6; }
+        .bp-folder-header { cursor: pointer; transition: 0.2s; background: #fff !important; }
+        .bp-folder-header:hover { background: #f8f9fa !important; }
+        .bp-input { width: 70px; padding: 8px; border-radius: 8px; border: 1px solid #dfe6e9; background: #fff; color: #2d3436; font-weight: bold; text-align: center; font-size: 15px; }
+        .bp-diff { font-weight: bold; font-size: 0.9em; padding: 4px 8px; border-radius: 5px; }
+        .bp-diff.plus { color: #00b894; background: #e6fffa; }
+        .bp-diff.minus { color: #b2bec3; }
+        .bp-item-name { display: flex; align-items: center; justify-content: flex-start; gap: 10px; font-weight: bold; color: #2f3542; }
+        .bp-img { width: 40px; height: 40px; background: white; border-radius: 8px; padding: 2px; border: 1px solid #eee; object-fit: contain; }
+
+        /* 즐겨찾기 */
+        .link-input-area { display: flex; gap: 10px; margin-bottom: 25px; flex-wrap: wrap; }
+        .link-input { padding: 12px 20px; border-radius: 25px; border: 2px solid #f1f2f6; background: #ffffff; color: #555; font-size: 15px; outline: none; flex-grow: 1; box-shadow: inset 0 2px 5px rgba(0,0,0,0.02); transition: 0.3s; }
+        .link-input:focus { border-color: var(--accent-blue); box-shadow: 0 0 0 4px rgba(123, 237, 159, 0.2); }
+        .add-btn { padding: 0 25px; background: var(--accent-blue); color: #00796b; border: none; border-radius: 25px; font-weight: bold; cursor: pointer; white-space: nowrap; box-shadow: 0 4px 10px rgba(123, 237, 159, 0.3); transition: 0.2s; }
+        .add-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 15px rgba(123, 237, 159, 0.4); }
+        .link-folder { margin-bottom: 20px; border: 1px solid #eee; border-radius: 15px; overflow: hidden; background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.02); }
+        .link-folder-header { background: #fff; padding: 15px 20px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-weight: bold; color: #57606f; border-bottom: 1px solid #f1f2f6; }
+        .link-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; padding: 20px; background: #fdfbf7; }
+        .link-grid.hidden { display: none; }
+        .link-card { background: white; border: 1px solid #eee; border-radius: 15px; padding: 20px; text-align: center; position: relative; transition: all 0.3s; box-shadow: 0 4px 6px rgba(0,0,0,0.02); text-decoration: none; display: block; }
+        .link-card:hover { transform: translateY(-5px); border-color: var(--accent-blue); box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
+        .link-title { color: #2f3542; font-size: 1.1em; font-weight: bold; display: block; margin-bottom: 5px; }
+        .link-url { color: #a4b0be; font-size: 0.8em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+        .link-del-btn { position: absolute; top: 5px; right: 5px; background: transparent; color: #dfe6e9; border: none; font-size: 16px; cursor: pointer; }
+        .link-del-btn:hover { color: #ff7675; }
+
+        /* 테크 검색 */
+        .tek-search-layout { display: flex; gap: 20px; align-items: flex-start; height: 70vh; }
+        .tek-left-panel { width: 65%; height: 100%; overflow-y: auto; padding-right: 15px; } 
+        .tek-right-panel { width: 35%; height: 100%; overflow-y: auto; border-left: 2px dashed #eee; padding-left: 20px; }
+        .tek-folder { margin-bottom: 15px; border: 1px solid #eee; border-radius: 12px; overflow: hidden; background: white; }
+        .tek-folder-header { background: #fff; padding: 12px 15px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-weight: bold; color: #57606f; border-bottom: 1px solid #f1f2f6; }
+        .tek-btn-container { padding: 15px; display: flex; flex-wrap: wrap; gap: 8px; background: #fdfbf7; }
+        .tek-btn-container.hidden { display: none; }
+        .tek-btn { background: white; color: #747d8c; border: 1px solid #dfe6e9; padding: 8px 14px; border-radius: 20px; cursor: pointer; transition: 0.2s; font-size: 0.9em; font-weight: 500; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        .tek-btn:hover { background: #fff0f5; color: var(--accent-pink); border-color: var(--accent-pink); }
+        .tek-btn.selected { background: var(--accent-pink); color: white; border-color: var(--accent-pink); font-weight: bold; box-shadow: 0 4px 10px rgba(255, 107, 129, 0.4); }
+        .tek-result-card { background: white; border: 1px solid #eee; padding: 15px; border-radius: 15px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,0.03); }
+        .diff-badge { padding: 5px 10px; border-radius: 20px; font-size: 0.8em; font-weight: bold; margin-left: 10px; text-transform: uppercase; }
+        .diff-gamma { background: #e6fffa; color: #00b894; border: 1px solid #55efc4; }
+        .diff-beta { background: #e3f2fd; color: #2979ff; border: 1px solid #90caf9; }
+        .diff-alpha { background: #fff0f0; color: #ff7675; border: 1px solid #ff7675; }
+
+        /* 지도 */
+        .map-selector { display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; }
+        .map-btn { background: white; border: 2px solid #eee; padding: 10px 20px; border-radius: 25px; font-weight: bold; color: #747d8c; cursor: pointer; transition: 0.2s; font-size: 15px; }
+        .map-btn:hover, .map-btn.active { background: #e3f2fd; color: #2979ff; border-color: #2979ff; }
+        .map-viewport-container { position: relative; width: 100%; height: 600px; background: #dfe6e9; border-radius: 20px; overflow: hidden; border: 4px solid #fff; box-shadow: 0 10px 30px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center; }
+        .map-image { cursor: grab; transform-origin: center center; transition: transform 0.1s ease-out; max-width: none; }
+        .map-image:active { cursor: grabbing; }
+        .map-controls-overlay { position: absolute; bottom: 20px; right: 20px; display: flex; flex-direction: column; gap: 10px; background: rgba(255,255,255,0.9); padding: 10px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .zoom-btn { width: 40px; height: 40px; border-radius: 50%; border: none; background: white; font-weight: bold; font-size: 20px; color: #555; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.1); transition: 0.2s; }
+        .zoom-btn:hover { background: var(--accent-blue); color: white; }
+        
+        /* [추가] 입장 버튼 스타일 */
+        .enter-btn {
+            background: linear-gradient(135deg, #00b894, #0984e3);
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            transition: 0.2s;
+            animation: pulse 2s infinite;
+        }
+        .enter-btn:hover { transform: scale(1.05); }
+        .enter-btn:active { transform: scale(0.95); }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(0, 184, 148, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(0, 184, 148, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(0, 184, 148, 0); }
+        }
+        /* [추가] 로그인 모달 & 블러 효과 */
+        .blur-mode > *:not(#loginModal) { filter: blur(10px); pointer-events: none; user-select: none; }
+        .login-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); z-index: 9999; display: flex; justify-content: center; align-items: center; }
+        .login-box { background: white; padding: 40px; border-radius: 30px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.1); width: 320px; border: 1px solid #eee; }
+        .login-title { font-size: 1.5em; font-weight: 900; color: var(--accent-pink); margin-bottom: 10px; }
+        .login-desc { color: #888; margin-bottom: 25px; font-size: 0.9em; }
+        .login-input { width: 80%; padding: 15px; border: 2px solid #f1f2f6; border-radius: 15px; margin-bottom: 15px; font-size: 18px; text-align: center; font-weight: bold; outline: none; transition: 0.3s; color: #555; }
+        .login-input:focus { border-color: var(--accent-blue); box-shadow: 0 0 0 4px rgba(123, 237, 159, 0.2); }
+        .login-confirm-btn { width: 90%; padding: 15px; background: var(--accent-blue); color: #00796b; border: none; border-radius: 15px; font-weight: bold; cursor: pointer; font-size: 16px; transition: 0.2s; }
+        .login-confirm-btn:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(123, 237, 159, 0.4); }
+        .logout-btn { position: absolute; top: 20px; right: 20px; background: #dfe6e9; color: #636e72; border: none; padding: 8px 15px; border-radius: 20px; cursor: pointer; font-weight: bold; font-size: 13px; z-index: 100; }
+        .logout-btn:hover { background: #b2bec3; color: white; }
+        .group-badge { position: absolute; top: 25px; right: 110px; background: #fff0f5; color: var(--accent-pink); padding: 5px 12px; border-radius: 15px; font-weight: bold; font-size: 13px; border: 1px solid #ffcdd2; z-index: 100; }
+        
+        /* [추가] 인벤토리 폴더 스타일 */
+        .inv-folder { margin-bottom: 20px; border: 1px solid #eee; border-radius: 15px; overflow: hidden; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.02); }
+        .inv-folder-header { 
+            background: #fff; padding: 15px 20px; cursor: pointer; 
+            display: flex; justify-content: space-between; align-items: center; 
+            font-weight: bold; color: #57606f; border-bottom: 1px solid #f1f2f6; 
+            font-size: 1.1em; transition: 0.2s;
+        }
+        .inv-folder-header:hover { background: #f8f9fa; color: var(--accent-pink); }
+        .inv-folder-header.collapsed { border-bottom: none; }
+        .inv-folder-header.collapsed .folder-arrow { transform: rotate(-90deg); }
+        /* 기존 hidden 클래스 사용 (.hidden { display: none; }) */
+        
+        /* [최종 수정] 인벤토리 레이아웃 & 텍스트 줄바꿈 최적화 */
+        
+        /* 1. 폴더는 위아래로 배치 */
+        #inventoryArea {
+            display: block !important;
+        }
+
+        .inv-folder {
+            margin-bottom: 25px !important;
+            width: 100%;
+        }
+
+        /* 2. 그리드 너비 확장 (230px -> 260px) */
+        .inventory-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)) !important; 
+            gap: 15px; 
+            align-items: stretch; /* 높이를 동일하게 맞춤 */
+        }
+
+        /* 3. 아이템 박스 (높이가 유동적으로 늘어나도록 설정) */
+        .inv-item {
+            padding: 10px 15px !important;
+            height: auto !important;     /* 글자가 길어지면 박스도 커짐 */
+            min-height: 60px;            /* 최소 높이 확보 */
+            align-items: center;         /* 세로 중앙 정렬 */
+        }
+
+        /* 4. 텍스트 줄바꿈 설정 (핵심!) */
+        .inv-item-info {
+            width: 65%;                  /* 텍스트 공간 확보 */
+            word-break: keep-all;        /* 단어 중간에 끊기지 않음 (사냥꾼의 유\n물 -> X) */
+            line-height: 1.35;           /* 줄 간격을 살짝 좁혀서 2줄 되어도 이쁘게 */
+            display: flex; 
+            align-items: center;
+        }
+        
+        .inv-item-info label {
+            cursor: pointer;
+            margin-left: 5px;            /* 아이콘과 글자 사이 간격 미세 조정 */
+        }
+
+    </style>
+</head>
+<body>
+    <body>
+    <div id="loginModal" class="login-modal">
+        <div class="login-box">
+            <div class="login-title">🔒 비밀번호 입력</div>
+            <div class="login-desc">우리 부족만의 비밀번호(방제)를<br>입력하면 가방이 공유됩니다.</div>
+            <input type="text" id="groupPwInput" class="login-input" placeholder="예: 우리서버123" onkeypress="if(event.keyCode==13) login()">
+            <button class="login-confirm-btn" onclick="login()">접속하기</button>
+        </div>
+    </div>
+    
+    <div id="loginInfo" style="display:none;">
+        <span class="group-badge" id="groupNameDisplay"></span>
+        <button class="logout-btn" onclick="logout()">로그아웃</button>
+    </div>
+
+   
+    <h1>🦖 ARK: Manager <small style="font-size:0.4em; color:#aaa;">(Live Sync)</small></h1>
+
+    <div class="tab-container">
+        <button class="tab-btn active" onclick="openTab('bossTab')">⚔️ 보스 공략</button>
+        <button class="tab-btn" onclick="openTab('inventoryTab')">🎒 내 창고</button>
+        <button class="tab-btn" onclick="openTab('bpTab')">📜 BP 도감</button>
+        <button class="tab-btn" onclick="openTab('linkTab')">🔗 즐겨찾기</button>
+        <button class="tab-btn" onclick="openTab('tekTab')">💡 테크 검색</button>
+        <button class="tab-btn" onclick="openTab('mapTab')">🗺️ 지도</button>
+    </div>
+
+    <div id="bossTab" class="content show">
+        <div class="boss-layout">
+            <div class="boss-list-area" id="bossList"></div>
+            <div class="boss-detail-area" id="bossDetail">
+                <div style="text-align:center; padding-top: 150px; color:#a4b0be;"><h2>👈 보스를 선택하세요.</h2></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="inventoryTab" class="content">
+        <div class="section-header">
+            <h2 class="section-title">🎒 부족 공물(실시간)</h2>
+            <button class="reset-btn" onclick="resetInventory()">⚠️ 전체 초기화</button>
+        </div>
+        <div class="inventory-grid" id="inventoryArea"></div>
+    </div>
+
+    <div id="bpTab" class="content">
+        <div class="section-header">
+            <h2 class="section-title">📜 부족 BP 스펙 (실시간)</h2>
+            <button class="reset-btn" onclick="resetBP()">⚠️ 전체 초기화</button>
+        </div>
+        <div class="bp-table-container">
+            <table class="bp-table">
+                <thead><tr><th width="40%">아이템 이름</th><th width="20%">기본 스펙</th><th width="20%">내 최고 기록</th><th width="20%">성능 향상</th></tr></thead>
+                <tbody id="bpListArea"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="linkTab" class="content">
+        <h2 class="section-title">🔗 즐겨찾기 (실시간)</h2>
+        <div class="link-input-area">
+            <input type="text" id="linkFolder" list="folderList" placeholder="📂 폴더" class="link-input" style="flex: 0.5;">
+            <datalist id="folderList"></datalist> 
+            <input type="text" id="linkName" placeholder="사이트 이름" class="link-input" style="flex: 1;">
+            <input type="text" id="linkUrl" placeholder="URL 주소" class="link-input" style="flex: 1.5;" onkeypress="if(event.keyCode==13) addLink()">
+            <button class="add-btn" onclick="addLink()">추가</button>
+        </div>
+        <div id="linkList"></div>
+    </div>
+
+    <div id="tekTab" class="content">
+        <h2 class="section-title">💡 테크그램 역검색</h2>
+        <div class="tek-search-layout">
+            <div class="tek-left-panel">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                    <strong>🛠️ 카테고리별 테크 선택:</strong>
+                    <button onclick="clearTekSelection()" style="background:#dfe6e9; border:none; padding:5px 12px; border-radius:15px; cursor:pointer;">선택 초기화</button>
+                </div>
+                <div id="tekButtonArea"></div>
+            </div>
+            <div class="tek-right-panel">
+                <h3 style="color:#00b894; margin-top:0;">🔍 검색 결과</h3>
+                <div id="tekResultList"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="mapTab" class="content">
+        <h2 class="section-title">🗺️ 지도 뷰어</h2>
+        <div class="map-selector">
+            <button class="map-btn" onclick="loadMap('ragnarok', this)">🏔️ 라그나로크</button>
+            <button class="map-btn" onclick="loadMap('crystal', this)">💎 크리스탈 아일랜드</button>
+        </div>
+        <div class="map-viewport-container" id="mapViewport">
+            <div class="map-placeholder-text">지도를 선택해주세요</div>
+            <img id="mapImage" class="map-image" style="display:none;" draggable="false">
+            <div class="map-controls-overlay">
+                <button class="zoom-btn" onclick="zoomMap(0.2)">+</button>
+                <button class="zoom-btn" onclick="zoomMap(-0.2)">-</button>
+                <button class="zoom-btn" onclick="resetMap()" style="font-size:14px;">↺</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="ark_data.js"></script>
+
+<script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+        // [★중요] 기존 Firebase 설정을 그대로 유지하세요!
+        // ----------------------------------------------------
+        const firebaseConfig = {
+            apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
+            authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
+            databaseURL: REACT_APP_FIREBASE_DATABASE_URL,
+            projectId: REACT_APP_FIREBASE_PROJECT_ID,
+            storageBucket: REACT_APP_FIREBASE_STORAGEBUCKET,
+            messagingSenderId: REACT_APP_FIREBASE_MESSAGINGSENDERID,
+            appId: REACT_APP_FIREBASE_APPID
+        };
+        // ----------------------------------------------------
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        // 전역 변수
+        let currentGroupId = null; // 현재 접속한 방(비밀번호)
+        let myInventory = {};
+        let myBP = {};
+        let linkData = [];
+        let currentBoss = null;
+        let selectedTekgrams = new Set();
+        let currentScale = 1, isDragging = false, startX, startY, translateX = 0, translateY = 0;
+
+        // ===============================================
+        // [1] 로그인 & 그룹 관리 시스템
+        // ===============================================
+        
+        // 시작하자마자 자동 로그인 시도
+        window.onload = function() {
+            const savedId = localStorage.getItem('ark_group_id');
+            if(savedId) {
+                window.connectGroup(savedId);
+            } else {
+                document.body.classList.add('blur-mode'); // 로그인 전엔 블러 처리
+            }
+        };
+
+        window.login = function() {
+            const input = document.getElementById('groupPwInput');
+            const val = input.value.trim();
+            if(!val) return alert("비밀번호(방 제목)를 입력해주세요!");
+            
+            localStorage.setItem('ark_group_id', val); // 자동 로그인을 위해 저장
+            window.connectGroup(val);
+        };
+
+        window.logout = function() {
+            if(confirm("로그아웃 하시겠습니까?")) {
+                localStorage.removeItem('ark_group_id');
+                location.reload(); // 새로고침이 가장 깔끔한 리셋
+            }
+        };
+
+        window.connectGroup = function(groupId) {
+            currentGroupId = groupId;
+            
+            // UI 업데이트
+            document.body.classList.remove('blur-mode');
+            document.getElementById('loginModal').style.display = 'none';
+            document.getElementById('loginInfo').style.display = 'block';
+            document.getElementById('groupNameDisplay').innerText = `🔑 ${groupId}`;
+
+            // [핵심] Firebase 리스너 연결 (경로에 groupId 포함)
+            // 1. 인벤토리
+            onValue(ref(db, `groups/${groupId}/inventory`), (snapshot) => {
+                myInventory = snapshot.val() || {};
+                renderInventory();
+                if(currentBoss) showBossCalc(currentBoss);
+            });
+
+            // 2. BP
+            onValue(ref(db, `groups/${groupId}/bp`), (snapshot) => {
+                myBP = snapshot.val() || {};
+                renderBP();
+            });
+
+            // 3. 링크 (링크는 공유하지 않고 서버 공통으로 쓸지, 그룹별로 쓸지 결정 필요. 여기선 그룹별로 저장)
+            onValue(ref(db, `groups/${groupId}/links`), (snapshot) => {
+                linkData = snapshot.val() || [];
+                // 초기값 복구 로직
+                if(linkData.length <= 2) {
+                    const fullDefaultLinks = [
+                        { folder: "⭐ 주요 링크", name: "🥚 도도덱스", url: "https://www.dododex.com/" },
+                        { folder: "⭐ 주요 링크", name: "🦖 아크 위키 (Official)", url: "https://ark.wiki.gg/" },
+                        { folder: "⭐ 주요 링크", name: "🖥️ 아는형 서버 확인", url: "https://www.battlemetrics.com/servers/ark?q=아는형&sort=score" },
+                        { folder: "🎮 아는형 서버", name: "🏔️ 라그나로크", url: "steam://run/346110//+connect 61.80.40.6:27024" },
+                        { folder: "🎮 아는형 서버", name: "💎 크리스탈아일", url: "steam://run/346110//+connect 61.80.40.6:27016" },
+                        { folder: "🎮 아는형 서버", name: "🌍 더 센터", url: "steam://run/346110//+connect 61.80.40.6:27026" },
+                        { folder: "🎮 아는형 서버", name: "☢️ 익스팅션", url: "steam://run/346110//+connect 61.80.40.6:27017" },
+                        { folder: "🗺️ 자원 지도", name: "디 아일랜드", url: "https://ark.wiki.gg/wiki/Resource_Map/The_Island" },
+                        { folder: "🗺️ 자원 지도", name: "라그나로크", url: "https://ark.wiki.gg/wiki/Resource_Map/Ragnarok" },
+                        { folder: "🗺️ 자원 지도", name: "더 센터", url: "https://ark.wiki.gg/wiki/Resource_Map/The_Center" },
+                        { folder: "🗺️ 자원 지도", name: "익스팅션", url: "https://ark.wiki.gg/wiki/Resource_Map/Extinction" },
+                        { folder: "🗺️ 자원 지도", name: "제네시스 1", url: "https://ark.wiki.gg/wiki/Resource_Map/Genesis:_Part_1" },
+                        { folder: "🗺️ 자원 지도", name: "제네시스 2", url: "https://ark.wiki.gg/wiki/Resource_Map/Genesis:_Part_2" },
+                        { folder: "🗺️ 자원 지도", name: "크리스탈 아일랜드", url: "https://ark.wiki.gg/wiki/Resource_Map/Crystal_Isles" },
+                        { folder: "🗺️ 자원 지도", name: "스코치드 어스", url: "https://ark.wiki.gg/wiki/Resource_Map/Scorched_Earth" },
+                        { folder: "🗺️ 자원 지도", name: "에버레이션", url: "https://ark.wiki.gg/wiki/Resource_Map/Aberration" },
+                        { folder: "🗺️ 자원 지도", name: "발게로", url: "https://ark.wiki.gg/wiki/Resource_Map/Valguero" },
+                        { folder: "📺 참고 영상", name: "크아일 유물 위치 (YouTube)", url: "https://youtu.be/dywLUDiDFyQ?si=FEbWvX0DjFH0olg_" }
+                    ];
+                    set(ref(db, `groups/${groupId}/links`), fullDefaultLinks);
+                }
+                renderLinks();
+            });
+        };
+
+
+        // ===============================================
+        // [2] 기능 구현 (DB 경로가 groups/ID/... 로 변경됨)
+        // ===============================================
+
+        window.openTab = function(id) {
+            document.querySelectorAll('.content').forEach(d => d.classList.remove('show'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(id).classList.add('show');
+            event.target.classList.add('active');
+        };
+
+        // --- 인벤토리 ---
+        // [수정됨] 인벤토리 폴더 분류 렌더링 함수
+        function renderInventory() {
+            const area = document.getElementById("inventoryArea");
+            if(!area || typeof itemDatabase === 'undefined') return;
+            area.innerHTML = "";
+
+            // 1. 카테고리 정의 (순서대로 표시됨)
+            const categories = {
+                "artifact": "🗿 유물 (Artifacts)",
+                "tribute": "🥩 일반 공물 (Tributes)",
+                "alpha": "🦖 알파/희귀 공물 (Alpha)",
+                "trophy": "🏆 트로피 & 기타 (Trophies)"
+            };
+
+            // 2. 아이템을 카테고리별로 그룹화
+            const groupedItems = { "artifact": [], "tribute": [], "alpha": [], "trophy": [], "etc": [] };
+            
+            for (let [id, data] of Object.entries(itemDatabase)) {
+                // 데이터에 category가 없으면 'etc'로 분류
+                const cat = data.category || "etc";
+                if(!groupedItems[cat]) groupedItems[cat] = [];
+                groupedItems[cat].push({ id, ...data });
+            }
+
+            // 3. 카테고리별로 HTML 생성
+            Object.keys(categories).forEach(catKey => {
+                const items = groupedItems[catKey];
+                if(!items || items.length === 0) return;
+
+                // (1) 폴더 헤더 생성
+                const folderDiv = document.createElement("div");
+                folderDiv.className = "inv-folder";
+                folderDiv.innerHTML = `
+                    <div class="inv-folder-header" onclick="this.nextElementSibling.classList.toggle('hidden'); this.classList.toggle('collapsed');">
+                        <span>${categories[catKey]}</span>
+                        <span class="folder-arrow">▼</span>
+                    </div>
+                `;
+
+                // (2) 아이템 그리드 생성
+                const gridDiv = document.createElement("div");
+                gridDiv.className = "inventory-grid"; // 기존 그리드 스타일 사용
+                gridDiv.style.padding = "15px";
+                gridDiv.style.background = "#fdfbf7"; // 폴더 안쪽 배경색 살짝 다르게
+
+                items.forEach(item => {
+                    const count = myInventory[item.id] || 0;
+                    const imgTag = item.img ? `<img src="images/${item.img}" class="item-icon-large" onerror="this.style.visibility='hidden'">` : "";
+                    const minusDisabled = count <= 0 ? "disabled" : "";
+
+                    gridDiv.innerHTML += `
+                        <div class="inv-item">
+                            <div class="inv-item-info">${imgTag}<label>${item.name}</label></div>
+                            <div class="qty-control">
+                                <button class="qty-btn btn-minus" onclick="adjustQty('${item.id}', -1)" ${minusDisabled}>-</button>
+                                <input type="number" class="qty-input" min="0" value="${count}" onchange="updateInventory('${item.id}', this.value)">
+                                <button class="qty-btn btn-plus" onclick="adjustQty('${item.id}', 1)">+</button>
+                            </div>
+                        </div>`;
+                });
+
+                // (3) 합치기
+                folderDiv.appendChild(gridDiv);
+                area.appendChild(folderDiv);
+            });
+        }
+
+        window.adjustQty = function(id, change) {
+            let current = myInventory[id] || 0;
+            window.updateInventory(id, current + change);
+        };
+
+        window.updateInventory = function(id, val) {
+            if(!currentGroupId) return; // 로그인 안했으면 차단
+            let v = parseInt(val) || 0; if(v < 0) v = 0;
+            set(ref(db, `groups/${currentGroupId}/inventory/${id}`), v);
+        };
+
+        window.resetInventory = function() {
+            if(!currentGroupId) return;
+            if(confirm("정말로 초기화하시겠습니까? (공유된 데이터도 삭제됨)")) {
+                set(ref(db, `groups/${currentGroupId}/inventory`), {});
+            }
+        };
+
+        window.updateBossReqQty = function(id, val) {
+            window.updateInventory(id, val);
+        };
+        
+        // [추가] 보스 입장 재료 소모 함수
+        window.consumeMaterials = function(bossId, diffKey) {
+            if(!currentGroupId) return;
+            const boss = bossDatabase.find(b => b.id === bossId);
+            if (!boss || !boss.difficulties[diffKey]) return;
+            const diffData = boss.difficulties[diffKey];
+
+            if (!confirm(`🦖 [${boss.name} - ${diffKey}]\n\n입장하시겠습니까?\n창고에서 재료가 자동으로 차감됩니다.`)) return;
+
+            if (diffData.req) {
+                // 재료 부족 체크
+                for (let r of diffData.req) {
+                    const currentQty = myInventory[r.id] || 0;
+                    if (currentQty < r.count) {
+                        alert(`❌ 재료가 부족합니다: ${r.id}`);
+                        return;
+                    }
+                }
+                // 차감 실행
+                diffData.req.forEach(r => {
+                    const currentQty = myInventory[r.id] || 0;
+                    window.updateInventory(r.id, currentQty - r.count);
+                });
+                alert("✅ 재료가 소모되었습니다. 건투를 빕니다!");
+            }
+        };
+
+        // --- 보스 ---
+        function renderBossFolders() {
+            const list = document.getElementById("bossList");
+            if(!list || typeof bossDatabase === 'undefined') return;
+            list.innerHTML = "";
+            const addedMaps = new Set();
+            bossDatabase.forEach(boss => {
+                if(addedMaps.has(boss.map)) return;
+                addedMaps.add(boss.map);
+                const mapName = boss.map;
+                const bossesInMap = bossDatabase.filter(b => b.map === mapName);
+                
+                const folderBtn = document.createElement("button");
+                folderBtn.className = "map-folder-btn collapsed";
+                folderBtn.innerHTML = `<span>📂 ${mapName}</span> <span class="folder-arrow">◀</span>`;
+                
+                const container = document.createElement("div");
+                container.className = "map-boss-container hidden";
+                
+                bossesInMap.forEach(b => {
+                    const btn = document.createElement("button");
+                    btn.className = "boss-btn";
+                    const imgTag = b.img ? `<img src="images/${b.img}" class="boss-icon-small" onerror="this.style.display='none'">` : "";
+                    btn.innerHTML = `${imgTag} <strong>${b.name}</strong>`;
+                    btn.onclick = () => showBossCalc(b);
+                    container.appendChild(btn);
+                });
+
+                folderBtn.onclick = () => {
+                    if (container.classList.contains("hidden")) {
+                        container.classList.remove("hidden"); folderBtn.classList.remove("collapsed"); folderBtn.querySelector(".folder-arrow").innerText = "▼";
+                    } else {
+                        container.classList.add("hidden"); folderBtn.classList.add("collapsed"); folderBtn.querySelector(".folder-arrow").innerText = "◀";
+                    }
+                };
+                list.appendChild(folderBtn); list.appendChild(container);
+            });
+        }
+
+        function showBossCalc(boss) {
+            currentBoss = boss;
+            const detail = document.getElementById("bossDetail");
+            const mainImgTag = boss.img ? `<img src="images/${boss.img}" class="boss-main-image" onerror="this.style.display='none'">` : "";
+            
+            let html = `${mainImgTag}<h2 style="color:#ff6b81;">${boss.name} <small style="font-size:0.6em; color:#a4b0be;">[${boss.map}]</small></h2>`;
+            html += `<table><thead><tr><th width="15%">난이도</th><th>필요 재료 (내 보유량)</th><th width="18%">입장</th></tr></thead><tbody>`;
+
+            ['gamma', 'beta', 'alpha'].forEach(diffKey => {
+                const diffData = boss.difficulties[diffKey];
+                if(!diffData) return;
+
+                let rowClass = diffKey === 'gamma' ? "boss-row-gamma" : (diffKey === 'beta' ? "boss-row-beta" : "boss-row-alpha");
+                let reqHtml = "";
+                let isPossible = true;
+                
+                if(diffData.req) {
+                    diffData.req.forEach(r => {
+                        const itemData = itemDatabase[r.id];
+                        const itemName = itemData ? itemData.name : r.id; 
+                        const itemImg = (itemData && itemData.img) ? `<img src="images/${itemData.img}" class="item-icon-small" onerror="this.style.display='none'">` : "";
+                        const myCount = myInventory[r.id] || 0;
+                        
+                        let rowStatus = myCount >= r.count ? "row-ok" : "row-no";
+                        if(myCount < r.count) isPossible = false;
+                        
+                        const controlArea = `<div class="req-right"><input type="number" class="boss-req-input" min="0" value="${myCount}" onchange="updateBossReqQty('${r.id}', this.value)"><button class="quick-add-btn" onclick="adjustQty('${r.id}', 1)">+</button></div>`;
+                        
+                        reqHtml += `<div class="req-item-row ${rowStatus}"><div class="req-left">${itemImg} ${itemName}: ${r.count}</div>${controlArea}</div>`;
+                    });
+                }
+
+                const statusMsg = isPossible 
+                    ? `<div style="text-align:center;"><button class="enter-btn" onclick="consumeMaterials('${boss.id}', '${diffKey}')">🚀 입장하기</button></div>` 
+                    : `<div style="text-align:center;"><span class="status-no">재료 부족</span></div>`;
+                
+                let unlockTags = "";
+                if(diffData.unlocks) {
+                    diffData.unlocks.forEach(u => unlockTags += `<span class="unlock-tag">${u}</span>`);
+                }
+                const rewardHtml = `
+                    <div class="boss-reward-info">
+                        <div style="font-size:0.9em; color:#b2bec3;">🔓 해금 엔그램:</div>
+                        <div class="unlock-tags">${unlockTags}</div>
+                        ${diffData.element ? `<div style="margin-top:5px; color:#6c5ce7; font-weight:bold;">⚡ 원소: ${diffData.element}개</div>` : ''}
+                    </div>`;
+
+                html += `<tr class="${rowClass}">
+                            <td style="vertical-align:top;"><strong style="font-size:1.2em; color:#2f3542;">${diffData.level}</strong></td>
+                            <td style="text-align:left;">${reqHtml}${rewardHtml}</td>
+                            <td style="vertical-align:middle;">${statusMsg}</td>
+                         </tr>`;
+            });
+            html += `</tbody></table>`;
+            detail.innerHTML = html;
+        }
+
+        // --- BP 도감 ---
+        function renderBP() {
+            const listArea = document.getElementById("bpListArea");
+            if(!listArea || typeof bpDatabase === 'undefined') return;
+            listArea.innerHTML = "";
+            const groups = {};
+            bpDatabase.forEach(bp => { const f=bp.folder||"📁 기타"; if(!groups[f]) groups[f]=[]; groups[f].push(bp); });
+            for (const [folderName, items] of Object.entries(groups)) {
+                listArea.innerHTML += `<tr class="bp-folder-header"><td colspan="4" style="text-align:left; padding:15px;" onclick="this.nextElementSibling.classList.toggle('hidden')"><span style="font-weight:bold; color:#00b894;">📂 ${folderName}</span></td></tr>`;
+                items.forEach(bp => {
+                    const userVal = myBP[bp.id] || bp.default;
+                    const diff = (userVal - bp.default).toFixed(1);
+                    const diffClass = diff > 0 ? "plus" : "minus";
+                    const imgTag = bp.img ? `<img src="images/${bp.img}" class="bp-img">` : "";
+                    listArea.innerHTML += `
+                        <tr>
+                            <td><div class="bp-item-name">${imgTag}<span>${bp.name}</span></div></td>
+                            <td style="color:#b2bec3;">${bp.default}${bp.unit}</td>
+                            <td><input type="number" class="bp-input" value="${userVal}" onchange="saveBP('${bp.id}', this.value)"><span style="color:#00b894;">${bp.unit}</span></td>
+                            <td><span class="bp-diff ${diffClass}">${diff > 0 ? '▲ +'+diff : '-'}</span></td>
+                        </tr>`;
+                });
+            }
+        }
+
+        window.saveBP = function(id, val) {
+            if(!currentGroupId) return;
+            set(ref(db, `groups/${currentGroupId}/bp/${id}`), parseFloat(val)||0);
+        };
+
+        window.resetBP = function() {
+            if(!currentGroupId) return;
+            if(confirm("BP 기록을 초기화하시겠습니까?")) set(ref(db, `groups/${currentGroupId}/bp`), {});
+        };
+
+        // --- 링크 ---
+        function renderLinks() {
+            const list = document.getElementById("linkList");
+            const dl = document.getElementById("folderList");
+            if(!list) return;
+            list.innerHTML = ""; dl.innerHTML = "";
+            const groups = {};
+            const folderNames = new Set();
+            linkData.forEach(item => { const f=item.folder||"📁 기타"; if(!groups[f]) groups[f]=[]; groups[f].push(item); folderNames.add(f); });
+            folderNames.forEach(n => { const op=document.createElement("option"); op.value=n; dl.appendChild(op); });
+            for (const [folderName, items] of Object.entries(groups)) {
+                const div = document.createElement("div"); div.className = "link-folder";
+                div.innerHTML = `<div class="link-folder-header" onclick="this.nextElementSibling.classList.toggle('hidden')"><span>📂 ${folderName}</span></div>`;
+                const grid = document.createElement("div"); grid.className = "link-grid";
+                items.forEach((item) => {
+                    const realIdx = linkData.indexOf(item);
+                    grid.innerHTML += `<div style="position:relative;"><a href="${item.url}" target="_blank" class="link-card"><span class="link-title">${item.name}</span><span class="link-url">${item.url}</span></a><button class="link-del-btn" onclick="deleteLink(${realIdx})">×</button></div>`;
+                });
+                div.appendChild(grid); list.appendChild(div);
+            }
+        }
+
+        window.addLink = function() {
+            if(!currentGroupId) return;
+            const f=document.getElementById("linkFolder").value.trim()||"📁 기타";
+            const n=document.getElementById("linkName").value.trim();
+            let u=document.getElementById("linkUrl").value.trim();
+            if(!n||!u) return alert("입력 필요");
+            if(!u.startsWith("http") && !u.startsWith("steam")) u="https://"+u;
+            const newData = [...linkData, {folder:f, name:n, url:u}];
+            set(ref(db, `groups/${currentGroupId}/links`), newData);
+            document.getElementById("linkName").value=""; document.getElementById("linkUrl").value="";
+        };
+
+        window.deleteLink = function(idx) {
+            if(!currentGroupId) return;
+            if(confirm("삭제하시겠습니까?")) {
+                const newData = [...linkData];
+                newData.splice(idx, 1);
+                set(ref(db, `groups/${currentGroupId}/links`), newData);
+            }
+        };
+
+        // --- 테크 검색 ---
+        const tekCategories = [
+            { id: "major", name: "🌟 주요 핵심", items: ["테크 복제기", "테크 송신기", "테크 전용 보관함", "테크 텔레포터", "클로닝 챔버", "엑소 멕", "테크 호버 스키프", "테크 포스필드"] },
+            { id: "structure", name: "🏠 건축", keywords: ["토대", "천장", "벽", "문", "게이트", "창문", "해치", "울타리", "기둥", "사다리", "경사로", "계단", "난간"] },
+            { id: "equip", name: "⚔️ 장비", keywords: ["소총", "안장", "수류탄", "검", "방패", "레일건", "활", "권총", "발사기", "캐논", "건틀릿", "레깅스", "부츠", "흉갑", "헬멧", "수면 포드"] },
+            { id: "etc", name: "📦 기타", keywords: [] }
+        ];
+
+        window.renderTekButtons = function() {
+            if(typeof bossDatabase === 'undefined') return;
+            const area = document.getElementById("tekButtonArea");
+            if(!area) return;
+            area.innerHTML = "";
+            let allTekgrams = new Set();
+            bossDatabase.forEach(boss => {
+                if(boss.difficulties) Object.values(boss.difficulties).forEach(d => { 
+                    if(d.unlocks) d.unlocks.forEach(u => allTekgrams.add(u)); 
+                });
+            });
+            let sortedTek = Array.from(allTekgrams).sort();
+            tekCategories.forEach(cat => {
+                const header = document.createElement("h4");
+                header.style.cssText = "width:100%; margin:15px 0 5px 0; border-bottom:1px solid #eee; padding-bottom:5px; color:#57606f;";
+                header.innerText = cat.name;
+                area.appendChild(header);
+                const container = document.createElement("div");
+                container.style.cssText = "display:flex; flex-wrap:wrap; gap:5px; margin-bottom:10px;";
+                area.appendChild(container);
+                let itemsInCat = [];
+                if(cat.id === "major") itemsInCat = sortedTek.filter(t => cat.items.includes(t));
+                else if(cat.id === "etc") itemsInCat = sortedTek.filter(t => { let isMajor = tekCategories[0].items.includes(t); let isStructure = tekCategories[1].keywords.some(k => t.includes(k)); let isEquip = tekCategories[2].keywords.some(k => t.includes(k)); return !isMajor && !isStructure && !isEquip; });
+                else itemsInCat = sortedTek.filter(t => { let isMajor = tekCategories[0].items.includes(t); return !isMajor && cat.keywords.some(k => t.includes(k)); });
+                itemsInCat.forEach(tek => {
+                    const btn = document.createElement("button");
+                    btn.className = "tek-btn";
+                    btn.innerText = tek;
+                    btn.onclick = () => { if(selectedTekgrams.has(tek)) { selectedTekgrams.delete(tek); btn.classList.remove("selected"); } else { selectedTekgrams.add(tek); btn.classList.add("selected"); } searchBossByTek(); };
+                    container.appendChild(btn);
+                });
+            });
+        };
+
+        window.clearTekSelection = function() {
+            if(typeof selectedTekgrams !== 'undefined') selectedTekgrams.clear();
+            document.querySelectorAll(".tek-btn").forEach(b => b.classList.remove("selected"));
+            document.getElementById("tekResultList").innerHTML = "";
+        };
+
+        function searchBossByTek() {
+            const resultList = document.getElementById("tekResultList");
+            resultList.innerHTML = "";
+            if (selectedTekgrams.size === 0) {
+                resultList.innerHTML = "<div style='padding:20px; color:#aaa; text-align:center;'>테크그램을 선택하면<br>해결 가능한 보스가 표시됩니다.</div>";
+                return;
+            }
+            const targets = Array.from(selectedTekgrams);
+            let foundAny = false;
+            bossDatabase.forEach(boss => {
+                if(!boss.difficulties) return;
+                const gList = boss.difficulties.gamma?.unlocks || [];
+                const bList = boss.difficulties.beta?.unlocks || [];
+                const aList = boss.difficulties.alpha?.unlocks || [];
+                const poolGamma = new Set([...gList]);
+                const poolBeta  = new Set([...gList, ...bList]);
+                const poolAlpha = new Set([...gList, ...bList, ...aList]);
+                let matchedDiff = null;
+                if (targets.every(t => poolGamma.has(t))) matchedDiff = 'gamma';
+                else if (targets.every(t => poolBeta.has(t))) matchedDiff = 'beta';
+                else if (targets.every(t => poolAlpha.has(t))) matchedDiff = 'alpha';
+                if (matchedDiff) {
+                    foundAny = true;
+                    resultList.innerHTML += `
+                    <div class="tek-result-card">
+                        <div style="display:flex; align-items:center;">
+                            ${boss.img ? `<img src="images/${boss.img}" style="width:30px; height:30px; border-radius:50%; margin-right:10px; border:1px solid #eee;">` : ''}
+                            <div>
+                                <div style="font-size:0.95em; font-weight:bold;">${boss.name}</div>
+                                <div style="font-size:0.75em; color:#b2bec3;">${boss.map}</div>
+                            </div>
+                        </div>
+                        <span class="diff-badge diff-${matchedDiff}">${matchedDiff}</span>
+                    </div>`;
+                }
+            });
+            if (!foundAny) {
+                resultList.innerHTML = "<div style='padding:15px; color:#ff7675; text-align:center; font-size:0.9em;'>⚠️ 선택한 아이템들을<br>한 번에(한 보스로) 모두 얻을 수 있는 곳이 없습니다.<br><br>따로따로 얻거나 조합을 변경해보세요.</div>";
+            }
+        }
+
+        // --- 지도 ---
+        window.loadMap = function(type, btn) {
+            const img = document.getElementById("mapImage");
+            const ph = document.querySelector(".map-placeholder-text");
+            img.src = type === 'ragnarok' ? "images/map_ragnarok.png" : "images/map_crystal.png";
+            img.style.display = "block"; ph.style.display = "none";
+            img.onload = () => window.resetMap();
+            document.querySelectorAll(".map-btn").forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+        };
+        window.zoomMap = function(amount) { currentScale = Math.max(0.5, Math.min(5, currentScale + amount)); updateMapTransform(); };
+        window.resetMap = function() { currentScale = 1; translateX = 0; translateY = 0; updateMapTransform(); };
+        function updateMapTransform() { const img = document.getElementById("mapImage"); if(img) img.style.transform = `translate(${translateX}px, ${translateY}px) scale(${currentScale})`; }
+        const viewport = document.getElementById("mapViewport");
+        viewport.addEventListener("mousedown", e => { isDragging=true; startX=e.clientX-translateX; startY=e.clientY-translateY; });
+        window.addEventListener("mouseup", () => isDragging=false);
+        viewport.addEventListener("mousemove", e => { if(!isDragging) return; e.preventDefault(); translateX = e.clientX-startX; translateY = e.clientY-startY; updateMapTransform(); });
+
+        // 초기 렌더링
+        renderBossFolders();
+        window.renderTekButtons();
+
+    </script>
+</body>
+
+</html>
+
+
+
+
+
+
